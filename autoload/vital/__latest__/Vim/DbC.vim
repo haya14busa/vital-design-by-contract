@@ -17,7 +17,25 @@ function! s:_sfunc(funcname) abort
 endfunction
 
 " Design By Contract
-let g:vital_vim_dbc = {'store': {}}
+let s:funcstore = {}
+
+" @param {string} keyfuncname
+" @param {'func'|'pre'|'post'} key
+" @param {Funcref} func
+function! s:_store(keyfuncname, key, func) abort
+  if !has_key(s:funcstore, a:keyfuncname)
+    let s:funcstore[a:keyfuncname] = {}
+  endif
+  let s:funcstore[a:keyfuncname][a:key] = a:func
+endfunction
+
+" @param {string} keyfuncname
+" @param {'func'|'pre'|'post'} key
+" @param {list<any>} args
+" @param {dict} dict
+function! s:_run(keyfuncname, key, args, dict) abort
+  return call(s:funcstore[a:keyfuncname][a:key], a:args, a:dict)
+endfunction
 
 "" Type definition
 " @typedef {in} a:var argument of function
@@ -55,10 +73,9 @@ function! s:hookdef(func, config) abort
   let l:Pre = get(a:config, 'pre', s:_NOTHING)
   let l:Post = get(a:config, 'post', s:_NOTHING)
   let funcname = type(a:func) is# type('') ? a:func : s:funcname(a:func)
-  let g:vital_vim_dbc.store[funcname] = {
-  \   'pre': type(l:Pre) is# type('') ? function(l:Pre) : l:Pre,
-  \   'post': type(l:Post) is# type('') ? function(l:Post) : l:Post
-  \ }
+  call s:_store(funcname, 'pre', type(l:Pre) is# type('') ? function(l:Pre) : l:Pre)
+  call s:_store(funcname, 'post', type(l:Post) is# type('') ? function(l:Post) : l:Post)
+
   let copyfuncname = funcname . '___dbc_copied_func___'
   let copyfuncdef = s:copyfuncdef(funcname, copyfuncname)
 
@@ -66,7 +83,7 @@ function! s:hookdef(func, config) abort
   let [args, _] = s:extract_args(funcname)
   let defcopyfunc = [
   \   printf('execute "%s"', escape(copyfuncdef, '"')),
-  \   printf('let g:vital_vim_dbc.store[''%s''].func = function(''%s'')', funcname, copyfuncname),
+  \   printf('call %s(''%s'', ''func'', function(''%s''))', s:_sfunc('s:_store'), funcname, copyfuncname)
   \ ]
 
   let defline = substitute(s:_rebuild_defline(s:capturefunc(funcname)[0], funcname),
@@ -75,10 +92,10 @@ function! s:hookdef(func, config) abort
   let redefine = join([
   \          defline,
   \          '  let s = exists(''self'') ? self : {}',
-  \   printf('  let a = %s(a:, %s)', s:_sfunc('s:fixa'), string(args)),
-  \   printf('  call call(g:vital_vim_dbc.store[''%s''].pre, [a], s)', funcname),
-  \   printf('  let r = call(g:vital_vim_dbc.store[''%s''].func, a:000, s)', funcname),
-  \   printf('  call call(g:vital_vim_dbc.store[''%s''].post, [a, r], s)', funcname),
+  \   printf('  let a = %s(a:, %s)', s:_sfunc('s:_fixa'), string(args)),
+  \   printf('  call %s(''%s'', ''pre'', [a], s)', s:_sfunc('s:_run'), funcname),
+  \   printf('  let r = %s(''%s'', ''func'', a:000, s)', s:_sfunc('s:_run'), funcname),
+  \   printf('  call %s(''%s'', ''post'', [a, r], s)', s:_sfunc('s:_run'), funcname),
   \          '  return r',
   \          'endfunction',
   \ ], "\n")
@@ -93,14 +110,14 @@ function! s:funcname(funcref) abort
   return substitute(string(a:funcref), '\m^function(''\(.*\)'')$', '\1', '')
 endfunction
 
-" s:fixa() fixes a: of func(...) to a: of func(a, b, ...) from args.
+" s:_fixa() fixes a: of func(...) to a: of func(a, b, ...) from args.
 "   1. Add each arg as key to given a: so that users can use a:var
 "   2. Fix a:0 and shift a:1, a:2, ..., a:n
 "   3. Fix a:000 number
 " @param {a:} a
 " @param {list<string>} args
 " @return {a:}
-function! s:fixa(a, args) abort
+function! s:_fixa(a, args) abort
   let fixa = copy(a:a)
   let arglen = len(a:args)
   " 1. add arg name reference
