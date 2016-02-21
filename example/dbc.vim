@@ -1,7 +1,34 @@
 let s:V = vital#of('vital')
-call s:V.unload()
 let s:DbC = s:V.import('Vim.DbC')
 execute s:V.import('Vim.PowerAssert').define('Assert')
+
+function! s:flatten(list, ...) abort
+  let limit = a:0 > 0 ? a:1 : -1
+  let memo = []
+  if limit == 0
+    return a:list
+  endif
+  let limit -= 1
+  for Value in a:list
+    let memo +=
+    \  type(Value) == type([]) ?
+    \    s:flatten(Value, limit) :
+    \    [Value]
+    unlet! Value
+  endfor
+  return memo
+endfunction
+
+function! s:__pre_flatten(in) abort
+  Assert type(a:in.list) is# type([])
+  Assert type(get(a:in, 1, 0)) is# type(0)
+endfunction
+
+function! s:__post_flatten(in, out) abort
+  for l:X in a:out
+    Assert type(l:X) isnot# type([])
+  endfor
+endfunction
 
 function! s:fizzbuzz(n) abort
   return a:n % 15 ? a:n % 5 ? a:n % 3 ? a:n : 'Fizz' : 'Buzz' : 'FizzBuzz'
@@ -18,9 +45,12 @@ function! s:__post_fizzbuzz(in, out) abort
   Assert type(a:out) is# type(0) || type(a:out) is# type('')
 endfunction
 
+
 execute s:DbC.dbc()
 
-for i in range(1, 15)
+echo s:flatten([[1], [2, [3], [[4]]]])
+
+for i in range(1, 10)
   echo s:fizzbuzz(i)
 endfor
 " =>
