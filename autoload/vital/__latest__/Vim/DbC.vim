@@ -102,12 +102,15 @@ function! Vital_dbc_fixa(a, args) abort
   " 2. fix a:0
   let fixa[0] = fixa[0] - arglen
   " 2. fix a:1, a:2, ... a:n
-  for i in range(1, len(a:a['000']) - len(a:args))
+  for i in range(1, max([0, len(a:a['000']) - arglen]))
     let fixa[i] = a:a['000'][i + arglen - 1]
     call remove(fixa, i + arglen)
   endfor
   " 3. fix a:000
   let fixa['000'] = fixa['000'][arglen :]
+  if len(fixa['000']) is# 0 && has_key(fixa, 1)
+    call remove(fixa, 1)
+  endif
   return fixa
 endfunction
 
