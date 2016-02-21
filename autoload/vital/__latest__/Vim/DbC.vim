@@ -7,6 +7,15 @@ function! s:_vital_depends() abort
   return ['Vim.ScriptLocal']
 endfunction
 
+function! s:_SID() abort
+  return matchstr(expand('<sfile>'), '<SNR>\zs\d\+\ze__SID$')
+endfunction
+let s:_s = '<SNR>' . s:_SID() . '_'
+delfunction s:_SID
+function! s:_sfunc(funcname) abort
+  return substitute(a:funcname, '^s:', s:_s, '')
+endfunction
+
 " Design By Contract
 let g:vital_vim_dbc = {'store': {}}
 
@@ -66,7 +75,7 @@ function! s:hookdef(func, config) abort
   let redefine = join([
   \          defline,
   \          '  let s = exists(''self'') ? self : {}',
-  \   printf('  let a = g:Vital_dbc_fixa(a:, %s)', string(args)),
+  \   printf('  let a = %s(a:, %s)', s:_sfunc('s:fixa'), string(args)),
   \   printf('  call call(g:vital_vim_dbc.store[''%s''].pre, [a], s)', funcname),
   \   printf('  let r = call(g:vital_vim_dbc.store[''%s''].func, a:000, s)', funcname),
   \   printf('  call call(g:vital_vim_dbc.store[''%s''].post, [a, r], s)', funcname),
@@ -84,14 +93,14 @@ function! s:funcname(funcref) abort
   return substitute(string(a:funcref), '\m^function(''\(.*\)'')$', '\1', '')
 endfunction
 
-" Vital_dbc_fixa() fixes a: of func(...) to a: of func(a, b, ...) from args.
+" s:fixa() fixes a: of func(...) to a: of func(a, b, ...) from args.
 "   1. Add each arg as key to given a: so that users can use a:var
 "   2. Fix a:0 and shift a:1, a:2, ..., a:n
 "   3. Fix a:000 number
 " @param {a:} a
 " @param {list<string>} args
 " @return {a:}
-function! Vital_dbc_fixa(a, args) abort
+function! s:fixa(a, args) abort
   let fixa = copy(a:a)
   let arglen = len(a:args)
   " 1. add arg name reference
@@ -185,12 +194,12 @@ let s:_NOTHING = function('s:_nothing')
 "  2. s:__post__{func} will be calles after {func}
 " @return {executable_string}
 function! s:dbc() abort
-  return 'execute g:Vital_dbc_hookdefs(expand(''<sfile>''))'
+  return printf('execute %s(expand(''<sfile>''))', s:_sfunc('s:_dbc'))
 endfunction
 
 " @param {string} path
 " @return {executable_string}
-function! Vital_dbc_hookdefs(path) abort
+function! s:_dbc(path) abort
   let sfuncs = s:ScriptLocal.sfuncs(a:path)
   let dbc_sfuncs = s:aggregate_dbc_sfuncs(sfuncs)
   let defs = []
