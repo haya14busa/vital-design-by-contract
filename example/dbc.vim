@@ -19,15 +19,24 @@ function! s:flatten(list, ...) abort
   return memo
 endfunction
 
+" s:__pre_{func}() will be called before {func} with a:var args as a:in
 function! s:__pre_flatten(in) abort
+  " input should be list
   Assert type(a:in.list) is# type([])
+  " limit should be number
   Assert type(get(a:in, 1, 0)) is# type(0)
+  " You can use a:in.var to access a:var
+  echo '__pre_flatten : in : ' . string(a:in.list)
 endfunction
 
+" s:__post_{func}() will be called after {func} with a:var args as a:in and
+" returned value as a:out
 function! s:__post_flatten(in, out) abort
+  " Each value of returned list should not be list
   for l:X in a:out
     Assert type(l:X) isnot# type([])
   endfor
+  echo '__post_flatten: out: ' . string(a:out)
 endfunction
 
 function! s:fizzbuzz(n) abort
