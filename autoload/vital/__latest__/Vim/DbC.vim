@@ -214,10 +214,14 @@ function! s:dbc() abort
   return printf('execute %s(expand(''<sfile>''))', s:_sfunc('s:_dbc'))
 endfunction
 
-" @param {string} path
+" @param {string} sfile
 " @return {executable_string}
-function! s:_dbc(path) abort
-  let sfuncs = s:ScriptLocal.sfuncs(a:path)
+function! s:_dbc(sfile) abort
+  if a:sfile =~# '/'
+    let sfuncs = s:ScriptLocal.sfuncs(a:sfile)
+  else
+    let sfuncs = s:ScriptLocal.sid2sfuncs(matchstr(a:sfile, '<SNR>\zs\d\+\ze\w\+$'))
+  endif
   let dbc_sfuncs = s:aggregate_dbc_sfuncs(sfuncs)
   let defs = []
   for dbc_sfunc in dbc_sfuncs
